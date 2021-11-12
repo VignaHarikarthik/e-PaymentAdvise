@@ -1,5 +1,6 @@
 ﻿using CrystalDecisions.CrystalReports.Engine;
 using CrystalDecisions.Shared;
+using MySql.Data.MySqlClient;
 using System;
 using System.Data;
 using System.Data.SqlClient;
@@ -19,12 +20,17 @@ namespace e_PaymentAdvise
         static readonly SqlConnection KLConnection = new SqlConnection("Server=192.168.1.21;Database=Syspex Mechatronic (M) Sdn Bhd;Uid=Sa;Pwd=Password1111;");
         static readonly SqlConnection PGConnection = new SqlConnection("Server=192.168.1.21;Database=Syspex Industries (M) Sdn Bhd;Uid=Sa;Pwd=Password1111;");
         static SqlConnection SAPCon12 = new SqlConnection("Server=192.168.1.21;Database=AndriodAppDB;Uid=Sa;Pwd=Password1111;");
+        static readonly MySqlConnection PortalCon = new MySqlConnection("Server=192.168.1.228;Database=syspex_portal;Uid=root;Pwd=dogood;");
+
         static string SQLQuery;
         #endregion
         static void Main(string[] args)
         {
             //Go Live = 25/08/2020
             EPAYMENT("65ST");
+            ////Go Live = 31/05/2021
+            System.Threading.Thread.Sleep(5000);
+            EPAYMENT("07ST");
         }
 
         private static void EPAYMENT(string CompanyCode)
@@ -40,7 +46,7 @@ namespace e_PaymentAdvise
                     flag = SendInvociePDF(ds.Tables[0].Rows[i]["docnum"].ToString(),
                                           ds.Tables[0].Rows[i]["docentry"].ToString(),
                                           ds.Tables[0].Rows[i]["E_Mail"].ToString(),//Supplier email address
-                                          ds.Tables[0].Rows[i]["cc"].ToString(), CompanyCode, ds.Tables[0].Rows[i]["cardname"].ToString());
+                                          CompanyCode, ds.Tables[0].Rows[i]["cardname"].ToString());
 
                     DataTable dt = CheckDuplicateLog(ds.Tables[0].Rows[i]["docnum"].ToString(), CompanyCode).Tables[0];
 
@@ -137,10 +143,11 @@ namespace e_PaymentAdvise
             return dsetItem;
         }
 
-        private static bool SendInvociePDF(string DocNum, string DocEntry, string To, string CC, string CompanyCode, string VendorName)
+        private static bool SendInvociePDF(string DocNum, string DocEntry, string To, string CompanyCode, string VendorName)
         {
             bool success;
             string Databasename = "";
+            string CC = "";
             //To = "vigna@syspex.com,pheng.teoh@syspex.com,";
 
             if (CompanyCode == "65ST")
@@ -163,7 +170,17 @@ namespace e_PaymentAdvise
 
 
                 if (CompanyCode == "65ST")
+                {
                     cryRpt.Load("F:\\Crystal Reports\\65ST_Payment_Advice.rpt");
+                    CC = GetCC("65st", "e_payment");
+                }
+
+
+                if (CompanyCode == "07ST")
+                {
+                    cryRpt.Load("F:\\Crystal Reports\\07ST_Payment_Advice.rpt");
+                    CC = GetCC("07st", "e_payment");
+                }
 
                 new TableLogOnInfos();
                 TableLogOnInfo crtableLogoninfo;
@@ -220,10 +237,23 @@ namespace e_PaymentAdvise
                 };
 
                 mm.IsBodyHtml = true;
-                mm.Subject = "Remittance Advice From Syspex Technologies Pte Ltd - " + DocNum + "";
-                mm.Body = "<p>Dear Valued Supplier,</p> <p>This is to inform you payment has been made for the invoices as per attached. Payment will be received in 2 – 3 working days upon receiving this payment advice.</p>" +
-                         "<p> Regards,</p>" +
-           "<p>Syspex Technologies Pte Ltd</p> ";
+                if (CompanyCode == "65ST")
+                {
+                    mm.Subject = "Remittance Advice From Syspex Technologies Pte Ltd - " + DocNum + "";
+                    mm.Body = "<p>Dear Valued Supplier,</p> <p>This is to inform you payment has been made for the invoices as per attached. Payment will be received in 2 – 3 working days upon receiving this payment advice.</p>" +
+     "<p> Regards,</p>" +
+"<p>Syspex Technologies Pte Ltd</p> ";
+                }
+                if (CompanyCode == "07ST")
+                {
+                    mm.Subject = "Remittance Advice From Syspex Technologies (M) Sdn Bhd - " + DocNum + "";
+                    mm.Body = "<p>Dear Valued Supplier,</p> <p>This is to inform you payment has been made for the invoices as per attached. Payment will be received in 2 – 3 working days upon receiving this payment advice.</p>" +
+         "<p> Regards,</p>" +
+"<p>Syspex Technologies (M) Sdn Bhd</p> ";
+                }
+
+
+
                 //To
                 foreach (var address in To.Split(new[] { ";" }, StringSplitOptions.RemoveEmptyEntries))
                 {
@@ -289,9 +319,16 @@ namespace e_PaymentAdvise
             SqlConnection SQLConnection = new SqlConnection();
 
             if (CompanyCode == "65ST")
+            {
                 SQLConnection = SGConnection;
-            SQLQuery = "select top 10 * from (select  'vigna@syspex.com,pheng.teoh@syspex.com,analisa@syspex.com' as cc, docdate,docnum,docentry,CreateDate,CardName,CardCode,  (SELECT STUFF((select ',' + E_MailL from OCPR where CardCode = T0.CardCode  and Name like '%Accounts Receivable%'  FOR XML PATH('')), 1, 1, '')) as E_Mail from ovpm T0 where T0.DocNum not in (select DocNum from[AndriodAppDB].[dbo].syspex_ePayment)  and year(CreateDate) = year(getdate()) and month(CreateDate) = month(getdate()) and CreateDate <= getdate() ) X where X.E_Mail is not null order  by X.CreateDate desc";
-
+                SQLQuery = "select top 10 * from (select  docdate,docnum,docentry,CreateDate,CardName,CardCode,  (SELECT STUFF((select ',' + E_MailL from OCPR where CardCode = T0.CardCode  and Name like '%Accounts Receivable%'  FOR XML PATH('')), 1, 1, '')) as E_Mail from ovpm T0 where T0.DocNum not in (select DocNum from[AndriodAppDB].[dbo].syspex_ePayment where company ='" + CompanyCode + "')  and year(CreateDate) = year(getdate()) and month(CreateDate) = month(getdate()) and CreateDate <= getdate() ) X where  X.E_Mail is not null order  by X.CreateDate desc";
+            }
+            if (CompanyCode == "07ST")
+            {
+                SQLConnection = JBConnection;
+                // 15-06-2021 i have chnaged the docdate greater than or equal todays date
+                SQLQuery = "select top 10 * from (select  docdate,docnum,docentry,CreateDate,CardName,CardCode,  (SELECT STUFF((select ',' + E_Mail from OCRD where CardCode = T0.CardCode   FOR XML PATH('')), 1, 1, '')) as E_Mail from ovpm T0 where T0.DocNum not in (select DocNum from[AndriodAppDB].[dbo].syspex_ePayment where Company='" + CompanyCode + "')    and year(docdate) = year(getdate()) and DocDate >='20210622' and  DocDate <=getdate() ) X where  X.E_Mail is not null order  by X.DocDate desc";
+            }
             DataSet dsetItem = new DataSet();
             SqlCommand CmdItem = new SqlCommand(SQLQuery, SQLConnection)
             {
@@ -304,5 +341,26 @@ namespace e_PaymentAdvise
             SQLConnection.Close();
             return dsetItem;
         }
+        #region ----GetCCFROMPORTAL---
+        private static string GetCC(string Branch, string Category)
+        {
+            if (PortalCon.State == ConnectionState.Closed) { PortalCon.Open(); }
+            MySqlCommand CmdItem = new MySqlCommand("SELECT emails FROM sap_email_notification WHERE branch='" + Branch + "' AND category= '" + Category + "' LIMIT 1 ", PortalCon);
+            string retrievedValue = "";
+            CmdItem.CommandType = CommandType.Text;
+            using (MySqlDataReader reader = CmdItem.ExecuteReader())
+            {
+
+
+                while (reader.Read())
+                {
+                    retrievedValue = (string)reader.GetValue(0);
+
+                }
+                reader.Close();
+            }
+            return retrievedValue;
+        }
+        #endregion
     }
 }
