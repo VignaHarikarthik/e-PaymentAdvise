@@ -31,6 +31,9 @@ namespace e_PaymentAdvise
             ////Go Live = 31/05/2021
             System.Threading.Thread.Sleep(5000);
             EPAYMENT("07ST");
+            ////Go Live = 19/08/2022
+            System.Threading.Thread.Sleep(5000);
+            EPAYMENT("03SM");
         }
 
         private static void EPAYMENT(string CompanyCode)
@@ -47,7 +50,7 @@ namespace e_PaymentAdvise
                                           ds.Tables[0].Rows[i]["docentry"].ToString(),
                                           ds.Tables[0].Rows[i]["E_Mail"].ToString(),//Supplier email address
                                           CompanyCode, ds.Tables[0].Rows[i]["cardname"].ToString());
-
+                    
                     DataTable dt = CheckDuplicateLog(ds.Tables[0].Rows[i]["docnum"].ToString(), CompanyCode).Tables[0];
 
                     if (dt.Rows.Count > 0)
@@ -84,19 +87,18 @@ namespace e_PaymentAdvise
                             SAPCon12.Open();
                             cmd.Connection = SAPCon12;
                             cmd.CommandType = CommandType.Text;
-                            cmd.CommandText = @"INSERT INTO syspex_ePayment(Company,DocNum, CustomerCode,CustomerName,ToEmail,Path,SendDate,DocDate,Time,Status,CC) 
-                            VALUES(@param1,@param2,@param4,@param5 ,@param6,@param7,@param8,@param9,@param10,@param11,@param12)";
+                            cmd.CommandText = @"INSERT INTO syspex_ePayment(Company,DocNum, CustomerCode,CustomerName,ToEmail,Path,DocDate,Time,Status,CC) 
+                            VALUES(@param1,@param2,@param4,@param5 ,@param6,@param7,@param9,@param10,@param11,@param12)";
                             cmd.Parameters.AddWithValue("@param1", CompanyCode);
                             cmd.Parameters.AddWithValue("@param2", ds.Tables[0].Rows[i]["docnum"].ToString());
                             cmd.Parameters.AddWithValue("@param4", ds.Tables[0].Rows[i]["CardCode"].ToString());
                             cmd.Parameters.AddWithValue("@param5", ds.Tables[0].Rows[i]["cardname"].ToString());
                             cmd.Parameters.AddWithValue("@param6", ds.Tables[0].Rows[i]["E_Mail"].ToString());
                             cmd.Parameters.AddWithValue("@param7", "F:\\ePayment\\" + CompanyCode + "\\" + ds.Tables[0].Rows[i]["docnum"].ToString() + ".pdf");
-                            cmd.Parameters.AddWithValue("@param8", DateTime.Now.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture));
                             cmd.Parameters.AddWithValue("@param9", ds.Tables[0].Rows[i]["docdate"].ToString());
                             cmd.Parameters.AddWithValue("@param10", DateTime.Parse(DateTime.Now.TimeOfDay.ToString()));
                             cmd.Parameters.AddWithValue("@param11", "1");
-                            cmd.Parameters.AddWithValue("@param12", ds.Tables[0].Rows[i]["CC"].ToString());
+                            cmd.Parameters.AddWithValue("@param12", GetCC(CompanyCode, "e_payment"));
                             cmd.ExecuteNonQuery();
                             SAPCon12.Close();
 
@@ -107,19 +109,18 @@ namespace e_PaymentAdvise
                             SAPCon12.Open();
                             cmd.Connection = SAPCon12;
                             cmd.CommandType = CommandType.Text;
-                            cmd.CommandText = @"INSERT INTO syspex_ePayment(Company,DocNum, CustomerCode,CustomerName,ToEmail,Path,SendDate,DocDate,Time,Status,CC) 
-                            VALUES(@param1,@param2,@param4,@param5 ,@param6,@param7,@param8,@param9,@param10,@param11,@param12)";
+                            cmd.CommandText = @"INSERT INTO syspex_ePayment(Company,DocNum, CustomerCode,CustomerName,ToEmail,Path,DocDate,Time,Status,CC) 
+                            VALUES(@param1,@param2,@param4,@param5 ,@param6,@param7,@param9,@param10,@param11,@param12)";
                             cmd.Parameters.AddWithValue("@param1", CompanyCode);
                             cmd.Parameters.AddWithValue("@param2", ds.Tables[0].Rows[i]["docnum"].ToString());
                             cmd.Parameters.AddWithValue("@param4", ds.Tables[0].Rows[i]["CardCode"].ToString());
                             cmd.Parameters.AddWithValue("@param5", ds.Tables[0].Rows[i]["cardname"].ToString());
                             cmd.Parameters.AddWithValue("@param6", ds.Tables[0].Rows[i]["E_Mail"].ToString());
                             cmd.Parameters.AddWithValue("@param7", "F:\\ePayment\\" + CompanyCode + "\\" + ds.Tables[0].Rows[i]["docnum"].ToString() + ".pdf");
-                            cmd.Parameters.AddWithValue("@param8", DateTime.Now.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture));
                             cmd.Parameters.AddWithValue("@param9", ds.Tables[0].Rows[i]["docdate"].ToString());
                             cmd.Parameters.AddWithValue("@param10", DateTime.Parse(DateTime.Now.TimeOfDay.ToString()));
                             cmd.Parameters.AddWithValue("@param11", "0");
-                            cmd.Parameters.AddWithValue("@param12", ds.Tables[0].Rows[i]["CC"].ToString());
+                            cmd.Parameters.AddWithValue("@param12", GetCC(CompanyCode, "e_payment"));
                             cmd.ExecuteNonQuery();
                             SAPCon12.Close();
                         }
@@ -182,6 +183,14 @@ namespace e_PaymentAdvise
                     CC = GetCC("07st", "e_payment");
                 }
 
+
+                if (CompanyCode == "03SM")
+                {
+                    cryRpt.Load("F:\\Crystal Reports\\03SM_Payment_Advice.rpt");
+                    CC = GetCC("03sm", "e_payment");
+                }
+
+
                 new TableLogOnInfos();
                 TableLogOnInfo crtableLogoninfo;
                 var crConnectionInfo = new ConnectionInfo();
@@ -227,6 +236,7 @@ namespace e_PaymentAdvise
                     CrExportOptions.DestinationOptions = CrDiskFileDestinationOptions;
                     CrExportOptions.FormatOptions = CrFormatTypeOptions;
                 }
+                
                 cryRpt.Export();
 
                 //// Email Part 
@@ -251,7 +261,13 @@ namespace e_PaymentAdvise
          "<p> Regards,</p>" +
 "<p>Syspex Technologies (M) Sdn Bhd</p> ";
                 }
-
+                if (CompanyCode == "03SM")
+                {
+                    mm.Subject = "Remittance Advice From Syspex Mechatronic (M) sdn bhd - " + DocNum + "";
+                    mm.Body = "<p>Dear Valued Supplier,</p> <p>This is to inform you payment has been made for the invoices as per attached. Payment will be received in 2 – 3 working days upon receiving this payment advice.</p>" +
+         "<p> Regards,</p>" +
+"<p>Syspex Mechatronic (M) sdn bhd</p> ";
+                }
 
 
                 //To
@@ -277,13 +293,13 @@ namespace e_PaymentAdvise
                 System.Net.NetworkCredential NetworkCred = new System.Net.NetworkCredential
                 {
                     UserName = "noreply@syspex.com",
-                    Password = "design35"
+                    Password = "design360"
                 };
                 smtp.UseDefaultCredentials = true;
                 smtp.Credentials = NetworkCred;
                 smtp.Port = 587;
                 mm.Attachments.Add(new System.Net.Mail.Attachment(CrDiskFileDestinationOptions.DiskFileName));
-                smtp.Send(mm);
+              smtp.Send(mm);
                 success = true;
 
 
@@ -321,13 +337,19 @@ namespace e_PaymentAdvise
             if (CompanyCode == "65ST")
             {
                 SQLConnection = SGConnection;
-                SQLQuery = "select top 10 * from (select  docdate,docnum,docentry,CreateDate,CardName,CardCode,  (SELECT STUFF((select ',' + E_MailL from OCPR where CardCode = T0.CardCode  and Name like '%Accounts Receivable%'  FOR XML PATH('')), 1, 1, '')) as E_Mail from ovpm T0 where T0.DocNum not in (select DocNum from[AndriodAppDB].[dbo].syspex_ePayment where company ='" + CompanyCode + "')  and year(CreateDate) = year(getdate()) and month(CreateDate) = month(getdate()) and CreateDate <= getdate() ) X where  X.E_Mail is not null order  by X.CreateDate desc";
+                SQLQuery = "select top 10 * from (select  docdate,docnum,docentry,CreateDate,CardName,CardCode,  (SELECT STUFF((select ',' + E_MailL from OCPR where CardCode = T0.CardCode  and Name like '%Accounts Receivable%'  FOR XML PATH('')), 1, 1, '')) as E_Mail from ovpm T0 where T0.DocNum not in (select DocNum from[AndriodAppDB].[dbo].syspex_ePayment where company ='" + CompanyCode + "')  and year(CreateDate) = year(getdate()) and month(CreateDate) = month(getdate()) and CreateDate <= getdate() ) X where  X.E_Mail is not null  order  by X.CreateDate desc";
             }
             if (CompanyCode == "07ST")
             {
                 SQLConnection = JBConnection;
                 // 15-06-2021 i have chnaged the docdate greater than or equal todays date
-                SQLQuery = "select top 10 * from (select  docdate,docnum,docentry,CreateDate,CardName,CardCode,  (SELECT STUFF((select ',' + E_Mail from OCRD where CardCode = T0.CardCode   FOR XML PATH('')), 1, 1, '')) as E_Mail from ovpm T0 where T0.DocNum not in (select DocNum from[AndriodAppDB].[dbo].syspex_ePayment where Company='" + CompanyCode + "')    and year(docdate) = year(getdate()) and DocDate >='20210622' and  DocDate <=getdate() ) X where  X.E_Mail is not null order  by X.DocDate desc";
+                SQLQuery = "select top 10 * from (select  docdate,docnum,docentry,CreateDate,CardName,CardCode,  (SELECT STUFF((select ',' + E_Mail from OCRD where CardCode = T0.CardCode   FOR XML PATH('')), 1, 1, '')) as E_Mail from ovpm T0 where T0.DocNum not in (select DocNum from[AndriodAppDB].[dbo].syspex_ePayment where Company='" + CompanyCode + "')   and DocDate >='20210622' and  DocDate <=getdate() ) X where  X.E_Mail is not null order  by X.DocDate desc";
+            }
+            if (CompanyCode == "03SM")
+            {
+                SQLConnection = KLConnection;
+                // 19/08/2022 i have chnaged the docdate greater than or equal todays date
+                SQLQuery = "select top 10 * from (select  docdate,docnum,docentry,CreateDate,CardName,CardCode,  (SELECT STUFF((select ',' + E_Mail from OCRD where CardCode = T0.CardCode   FOR XML PATH('')), 1, 1, '')) as E_Mail from ovpm T0 where T0.DocNum not in (select DocNum from[AndriodAppDB].[dbo].syspex_ePayment where Company='" + CompanyCode + "')   and DocDate >='20220819' and  DocDate <=getdate() ) X where  X.E_Mail is not null order  by X.DocDate desc";
             }
             DataSet dsetItem = new DataSet();
             SqlCommand CmdItem = new SqlCommand(SQLQuery, SQLConnection)
